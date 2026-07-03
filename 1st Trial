@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Customer Retention Dashboard</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background-color: #f4f4f9; }
+        .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .upload-section { margin-top: 10px; }
+        .btn-upload { background: #3498db; color: white; padding: 10px 15px; border-radius: 5px; cursor: pointer; display: inline-block; margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Dashboard Retention & CS Impact</h1>
+        <div class="upload-section">
+            <label class="btn-upload">Upload Data Order <input type="file" id="orderCsv" hidden></label>
+            <label class="btn-upload" style="background: #e74c3c;">Upload Data CS <input type="file" id="csCsv" hidden></label>
+        </div>
+    </div>
+    <div id="hasilData"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script>
+        // Logika sederhana untuk mengetes upload
+        document.getElementById('orderCsv').addEventListener('change', function(e) {
+            Papa.parse(e.target.files[0], {
+                header: true,
+                complete: function(results) {
+                    alert('Data Order berhasil diupload! Jumlah baris: ' + results.data.length);
+                    console.log(results.data);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
