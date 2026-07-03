@@ -2,65 +2,121 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Master Retention Dashboard</title>
+    <title>Customer Retention & CS Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; display: flex; flex-direction: column; height: 100vh; }
-        .sidebar { width: 280px; background: #1e293b; color: white; padding: 20px; position: fixed; height: 100%; }
-        .main { margin-left: 320px; padding: 40px; flex-grow: 1; }
-        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        .btn-upload { display: block; background: #3b82f6; color: white; padding: 12px; text-align: center; border-radius: 8px; cursor: pointer; margin-bottom: 10px; font-weight: 600; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        h1 { color: #1e293b; font-size: 24px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f1f5f9; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        .sidebar { width: 300px; background: #0f172a; color: white; padding: 30px 20px; position: fixed; height: 100%; box-sizing: border-box; }
+        .main { margin-left: 300px; padding: 40px; flex-grow: 1; box-sizing: border-box; }
+        .card { background: white; border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+        .btn-upload { display: block; background: #3b82f6; color: white; padding: 12px; text-align: center; border-radius: 8px; cursor: pointer; margin-bottom: 15px; font-weight: 600; transition: background 0.3s; }
+        .btn-upload:hover { opacity: 0.9; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        h1 { color: #1e293b; font-size: 28px; margin-top: 0; }
+        h2 { font-size: 20px; border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 25px; }
+        .status-text { font-size: 13px; color: #94a3b8; text-align: center; margin-top: -5px; margin-bottom: 20px; display: block; }
     </style>
 </head>
 <body>
     <div class="sidebar">
         <h2>Dashboard Panel</h2>
-        <label class="btn-upload">Upload Order CSV <input type="file" id="orderInput" hidden></label>
-        <label class="btn-upload" style="background:#ef4444;">Upload CS CSV <input type="file" id="csInput" hidden></label>
-        <p style="font-size:12px; color:#94a3b8;">Format: customer_id, date, amount</p>
+        
+        <label class="btn-upload">Upload Data Order CSV <input type="file" id="orderInput" hidden></label>
+        <span id="orderStatus" class="status-text">Data Order: Kosong</span>
+
+        <label class="btn-upload" style="background:#ef4444;">Upload Data CS CSV <input type="file" id="csInput" hidden></label>
+        <span id="csStatus" class="status-text">Data CS: Kosong</span>
+
+        <p style="font-size:12px; color:#64748b; margin-top: 30px; line-height: 1.5;">
+            *Grafik akan otomatis muncul setelah file diunggah. Semua data diproses secara aman di browser Anda.
+        </p>
     </div>
+
     <div class="main">
-        <h1>Overview Retention & CS Analysis</h1>
+        <h1>Dashboard Analisis CS & Tren Pelanggan</h1>
         <div class="grid">
-            <div class="card"><div id="chartRetention"></div></div>
-            <div class="card"><div id="chartIssues"></div></div>
+            <div class="card"><div id="chartRetention" style="min-height: 350px;"><i>(Upload Data Order untuk melihat tren)</i></div></div>
+            <div class="card"><div id="chartIssues" style="min-height: 350px;"><i>(Upload Data CS untuk melihat kategori masalah)</i></div></div>
         </div>
-        <div class="card"><div id="chartChurn"></div></div>
     </div>
 
     <script>
         let orders = [], cs = [];
-        document.getElementById('orderInput').onchange = e => parse(e.target.files[0], d => { orders = d; update(); });
-        document.getElementById('csInput').onchange = e => parse(e.target.files[0], d => { cs = d; update(); });
 
+        // Deteksi File Order Di-upload
+        document.getElementById('orderInput').onchange = e => {
+            document.getElementById('orderStatus').innerText = "Memproses...";
+            parse(e.target.files[0], d => { 
+                orders = d; 
+                document.getElementById('orderStatus').innerText = `Sukses: ${d.length} Baris`;
+                update(); 
+            });
+        };
+
+        // Deteksi File CS Di-upload
+        document.getElementById('csInput').onchange = e => {
+            document.getElementById('csStatus').innerText = "Memproses...";
+            parse(e.target.files[0], d => { 
+                cs = d; 
+                document.getElementById('csStatus').innerText = `Sukses: ${d.length} Baris`;
+                update(); 
+            });
+        };
+
+        // Fungsi Pembaca CSV 
         function parse(file, cb) {
-            Papa.parse(file, { header: true, dynamicTyping: true, complete: r => cb(r.data) });
+            Papa.parse(file, { 
+                header: true, 
+                dynamicTyping: true, 
+                skipEmptyLines: true,
+                complete: r => cb(r.data) 
+            });
         }
 
+        // Fungsi untuk Memperbarui Visualisasi
         function update() {
-            if(!orders.length) return;
-            const months = orders.reduce((acc, r) => {
-                const m = new Date(r.date || r.order_date).toLocaleString('default', {month:'short'});
-                acc[m] = (acc[m] || 0) + 1;
-                return acc;
-            }, {});
-
-            Plotly.newPlot('chartRetention', [{
-                x: Object.keys(months), y: Object.values(months), type: 'bar', marker: {color:'#3b82f6'}
-            }], {title: 'Trend Order Bulanan'});
-
-            if(cs.length) {
-                const issues = cs.reduce((acc, r) => {
-                    const type = r.issue_type || 'General';
-                    acc[type] = (acc[type] || 0) + 1;
+            // 1. Tampilkan Grafik Order (Jika Data Order Ada)
+            if(orders.length > 0) {
+                const months = orders.reduce((acc, r) => {
+                    const dateVal = r.date || r.order_date || r.date_key;
+                    if(dateVal) {
+                        const m = new Date(dateVal).toLocaleString('id-ID', {month:'short', year:'numeric'});
+                        if (m !== 'Invalid Date') {
+                            acc[m] = (acc[m] || 0) + 1;
+                        }
+                    }
                     return acc;
                 }, {});
+
+                Plotly.newPlot('chartRetention', [{
+                    x: Object.keys(months), y: Object.values(months), type: 'bar', marker: {color:'#3b82f6'}
+                }], {title: 'Trend Transaksi/Pelanggan Aktif'});
+            }
+
+            // 2. Tampilkan Grafik CS (Disesuaikan dengan file raw data Anda)
+            if(cs.length > 0) {
+                const issues = cs.reduce((acc, r) => {
+                    // Mengambil kolom "tipe_complaint" dari file CSV Anda
+                    const type = r.tipe_complaint || r.alasan_complaint || 'Lainnya';
+                    
+                    if (type && type.trim() !== '') {
+                        acc[type] = (acc[type] || 0) + 1;
+                    }
+                    return acc;
+                }, {});
+                
+                // Urutkan dan ambil 7 tipe keluhan teratas agar grafik berbentuk Pie tidak terlalu berantakan
+                const sortedIssues = Object.entries(issues)
+                    .sort((a,b) => b[1] - a[1])
+                    .slice(0, 7);
+                
+                const issueLabels = sortedIssues.map(i => i[0]);
+                const issueValues = sortedIssues.map(i => i[1]);
+
                 Plotly.newPlot('chartIssues', [{
-                    labels: Object.keys(issues), values: Object.values(issues), type: 'pie'
-                }], {title: 'Kategori Komplain CS'});
+                    labels: issueLabels, values: issueValues, type: 'pie', hole: 0.4, textinfo: 'percent'
+                }], {title: 'Top 7 Kategori Komplain (tipe_complaint)'});
             }
         }
     </script>
