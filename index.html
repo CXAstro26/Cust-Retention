@@ -2,36 +2,67 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Customer Retention Dashboard</title>
+    <title>Master Retention Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; background-color: #f4f4f9; }
-        .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .upload-section { margin-top: 10px; }
-        .btn-upload { background: #3498db; color: white; padding: 10px 15px; border-radius: 5px; cursor: pointer; display: inline-block; margin-right: 10px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        .sidebar { width: 280px; background: #1e293b; color: white; padding: 20px; position: fixed; height: 100%; }
+        .main { margin-left: 320px; padding: 40px; flex-grow: 1; }
+        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .btn-upload { display: block; background: #3b82f6; color: white; padding: 12px; text-align: center; border-radius: 8px; cursor: pointer; margin-bottom: 10px; font-weight: 600; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        h1 { color: #1e293b; font-size: 24px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Dashboard Retention & CS Impact</h1>
-        <div class="upload-section">
-            <label class="btn-upload">Upload Data Order <input type="file" id="orderCsv" hidden></label>
-            <label class="btn-upload" style="background: #e74c3c;">Upload Data CS <input type="file" id="csCsv" hidden></label>
-        </div>
+    <div class="sidebar">
+        <h2>Dashboard Panel</h2>
+        <label class="btn-upload">Upload Order CSV <input type="file" id="orderInput" hidden></label>
+        <label class="btn-upload" style="background:#ef4444;">Upload CS CSV <input type="file" id="csInput" hidden></label>
+        <p style="font-size:12px; color:#94a3b8;">Format: customer_id, date, amount</p>
     </div>
-    <div id="hasilData"></div>
+    <div class="main">
+        <h1>Overview Retention & CS Analysis</h1>
+        <div class="grid">
+            <div class="card"><div id="chartRetention"></div></div>
+            <div class="card"><div id="chartIssues"></div></div>
+        </div>
+        <div class="card"><div id="chartChurn"></div></div>
+    </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script>
-        // Logika sederhana untuk mengetes upload
-        document.getElementById('orderCsv').addEventListener('change', function(e) {
-            Papa.parse(e.target.files[0], {
-                header: true,
-                complete: function(results) {
-                    alert('Data Order berhasil diupload! Jumlah baris: ' + results.data.length);
-                    console.log(results.data);
-                }
-            });
-        });
+        let orders = [], cs = [];
+        document.getElementById('orderInput').onchange = e => parse(e.target.files[0], d => { orders = d; update(); });
+        document.getElementById('csInput').onchange = e => parse(e.target.files[0], d => { cs = d; update(); });
+
+        function parse(file, cb) {
+            Papa.parse(file, { header: true, dynamicTyping: true, complete: r => cb(r.data) });
+        }
+
+        function update() {
+            if(!orders.length) return;
+            const months = orders.reduce((acc, r) => {
+                const m = new Date(r.date || r.order_date).toLocaleString('default', {month:'short'});
+                acc[m] = (acc[m] || 0) + 1;
+                return acc;
+            }, {});
+
+            Plotly.newPlot('chartRetention', [{
+                x: Object.keys(months), y: Object.values(months), type: 'bar', marker: {color:'#3b82f6'}
+            }], {title: 'Trend Order Bulanan'});
+
+            if(cs.length) {
+                const issues = cs.reduce((acc, r) => {
+                    const type = r.issue_type || 'General';
+                    acc[type] = (acc[type] || 0) + 1;
+                    return acc;
+                }, {});
+                Plotly.newPlot('chartIssues', [{
+                    labels: Object.keys(issues), values: Object.values(issues), type: 'pie'
+                }], {title: 'Kategori Komplain CS'});
+            }
+        }
     </script>
 </body>
 </html>
