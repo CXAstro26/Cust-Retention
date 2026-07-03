@@ -16,7 +16,7 @@
         .header-subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 25px; }
         
         /* Buttons & Inputs */
-        .btn-upload { display: block; width: 100%; background: var(--primary); color: white; padding: 12px; text-align: center; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; margin-bottom: 5px; box-sizing: border-box; transition: 0.2s; }
+        .btn-upload { display: block; width: 100%; background: var(--primary); color: white; padding: 12px; text-align: center; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; margin-bottom: 5px; box-sizing: border-box; transition: 0.2s; border: none; }
         .btn-upload:hover { opacity: 0.9; }
         .status-text { font-size: 12px; color: #94a3b8; text-align: center; display: block; margin-bottom: 20px; }
         
@@ -39,27 +39,29 @@
 
     <div class="sidebar">
         <h2>Data Management</h2>
-        <label class="btn-upload" style="background:#ef4444;">1. Upload Data CS (CSV) <input type="file" id="csInput" hidden></label>
+        <label class="btn-upload" style="background:#ef4444;">1. Upload Data CS (CSV) <input type="file" id="csInput" accept=".csv" hidden></label>
         <span id="csStatus" class="status-text">Menunggu file CS...</span>
 
-        <label class="btn-upload">2. Upload Data Order (CSV) <input type="file" id="orderInput" hidden></label>
+        <label class="btn-upload">2. Upload Data Order (CSV) <input type="file" id="orderInput" accept=".csv" hidden></label>
         <span id="orderStatus" class="status-text">Menunggu file Order...</span>
 
+        <button id="btnReset" class="btn-upload" style="background:#475569; margin-top: 10px;">🔄 Reset Data</button>
+
         <div style="margin-top: 30px; font-size: 12px; color: #64748b; line-height: 1.6; background: #1e293b; padding: 15px; border-radius: 8px;">
-            <strong>ℹ️ Info Metrik CX:</strong><br><br>
-            Sistem otomatis menghitung korelasi pengiriman (Created vs Arrived), Perilaku Buyer (Repeat Complainers), dan Kinerja Hub berdasarkan data yang diunggah.
+            <strong>ℹ️ Info Upload:</strong><br><br>
+            Sistem kini bersifat <b>Kumulatif</b>. Jika Anda mengunggah file Januari lalu Februari, data akan digabungkan secara otomatis. Klik Reset untuk mengosongkan.
         </div>
     </div>
 
     <div class="main-content">
         <h1 class="header-title">Customer Experience & Retention Dashboard</h1>
-        <p class="header-subtitle">Analisis perilaku komplain, performa operasional, dan retensi pelanggan.</p>
+        <p class="header-subtitle">Analisis perilaku komplain, performa operasional, dan retensi pelanggan secara kumulatif.</p>
 
         <div class="kpi-grid">
             <div class="kpi-card">
                 <div class="kpi-label">Total Tiket Komplain</div>
                 <div class="kpi-value" id="kpiTotalTickets">0</div>
-                <div class="kpi-desc">Total baris data keluhan yang diproses.</div>
+                <div class="kpi-desc">Total baris data keluhan yang diakumulasi.</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Repeat Complainers</div>
@@ -102,7 +104,7 @@
 
             <div class="chart-card full">
                 <h3 class="chart-title">4 & 5. Weekly/Monthly Customer Retention</h3>
-                <p class="chart-desc">Korelasi antara pelanggan yang komplain dan pembelian ulang mereka (Membutuhkan Data Order).</p>
+                <p class="chart-desc">Tren volume order kumulatif (Akan bereaksi setelah Data Order diunggah).</p>
                 <div id="chartRetention" class="plot-container" style="display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 8px;">
                     <span style="color: #64748b;">Silakan Upload Data Order CSV untuk melihat matriks Retensi.</span>
                 </div>
@@ -111,10 +113,10 @@
     </div>
 
     <script>
+        // Array disiapkan untuk menampung data kumulatif
         let rawCS = [];
         let rawOrder = [];
 
-        // Konfigurasi Standar Plotly
         const layoutConfig = {
             font: { family: 'Inter', size: 11, color: '#64748b' },
             paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
@@ -122,18 +124,42 @@
             autosize: true
         };
 
-        // Event Listener Upload
+        // Fungsi Reset Data
+        document.getElementById('btnReset').onclick = () => {
+            if(confirm("Apakah Anda yakin ingin mereset/menghapus semua data dari dashboard?")) {
+                location.reload(); // Me-reload halaman akan mengosongkan RAM browser
+            }
+        };
+
+        // Event Listener Upload CS (Kumulatif)
         document.getElementById('csInput').onchange = e => {
+            if(!e.target.files[0]) return;
             document.getElementById('csStatus').innerText = "Memproses Data CX...";
+            
             Papa.parse(e.target.files[0], { header: true, dynamicTyping: true, skipEmptyLines: true,
-                complete: r => { rawCS = r.data; document.getElementById('csStatus').innerHTML = `<b>Sukses:</b> ${rawCS.length} Tiket`; processCSData(); }
+                complete: r => { 
+                    // LOGIKA KUMULATIF: Gabungkan data baru dengan data lama
+                    rawCS = rawCS.concat(r.data); 
+                    document.getElementById('csStatus').innerHTML = `<b>Kumulatif:</b> ${rawCS.length.toLocaleString()} Tiket`; 
+                    e.target.value = ''; // Reset input agar file yang sama bisa diupload ulang jika perlu
+                    processCSData(); 
+                }
             });
         };
 
+        // Event Listener Upload Order (Kumulatif)
         document.getElementById('orderInput').onchange = e => {
+            if(!e.target.files[0]) return;
             document.getElementById('orderStatus').innerText = "Memproses Data Order...";
+            
             Papa.parse(e.target.files[0], { header: true, dynamicTyping: true, skipEmptyLines: true,
-                complete: r => { rawOrder = r.data; document.getElementById('orderStatus').innerHTML = `<b>Sukses:</b> ${rawOrder.length} Order`; processRetention(); }
+                complete: r => { 
+                    // LOGIKA KUMULATIF: Gabungkan data baru dengan data lama
+                    rawOrder = rawOrder.concat(r.data); 
+                    document.getElementById('orderStatus').innerHTML = `<b>Kumulatif:</b> ${rawOrder.length.toLocaleString()} Order`; 
+                    e.target.value = ''; // Reset input
+                    processRetention(); 
+                }
             });
         };
 
@@ -141,58 +167,48 @@
         function processCSData() {
             if(rawCS.length === 0) return;
 
-            // 1. KPI & Repeat Complainers (Behavior)
             document.getElementById('kpiTotalTickets').innerText = rawCS.length.toLocaleString();
             
             let customerCounts = {};
             let agentCounts = {};
             let deliveryTimes = [];
             
-            // Loop untuk mengumpulkan data mentah
             rawCS.forEach(row => {
-                // Tracking Customer (No_HP atau ID)
                 let custId = row.customer_id || row.no_hp || row.nama_customer;
                 if(custId) customerCounts[custId] = (customerCounts[custId] || 0) + 1;
 
-                // Tracking Agent Productivity
                 let agent = row.nama_agent;
                 if(agent) agentCounts[agent] = (agentCounts[agent] || 0) + 1;
 
-                // Hitung SLA Pengiriman (Arrived - Created) dalam Menit
                 if(row.created_time && row.arrived_time) {
                     let created = new Date(row.created_time);
                     let arrived = new Date(row.arrived_time);
                     if(created != "Invalid Date" && arrived != "Invalid Date") {
                         let diffMins = (arrived - created) / 60000;
-                        if(diffMins > 0 && diffMins < 300) deliveryTimes.push(diffMins); // Filter anomali > 5 jam
+                        if(diffMins > 0 && diffMins < 300) deliveryTimes.push(diffMins);
                     }
                 }
             });
 
-            // Kalkulasi Repeaters
             let totalUniqueCust = Object.keys(customerCounts).length;
             let repeaters = Object.values(customerCounts).filter(v => v > 1).length;
             let repeaterPct = totalUniqueCust > 0 ? ((repeaters / totalUniqueCust) * 100).toFixed(1) : 0;
             document.getElementById('kpiRepeaters').innerText = repeaterPct + "%";
 
-            // Kalkulasi Agent Productivity
             let totalAgents = Object.keys(agentCounts).length;
             let avgTicketsPerAgent = totalAgents > 0 ? Math.round(rawCS.length / totalAgents) : 0;
-            document.getElementById('kpiAgent').innerText = avgTicketsPerAgent + " Tiket";
+            document.getElementById('kpiAgent').innerText = avgTicketsPerAgent.toLocaleString();
 
-            // Kalkulasi Avg SLA
             if(deliveryTimes.length > 0) {
                 let avgSla = Math.round(deliveryTimes.reduce((a,b)=>a+b, 0) / deliveryTimes.length);
                 document.getElementById('kpiSLA').innerText = avgSla + " Mnt";
                 renderDeliveryChart(deliveryTimes);
             }
 
-            // Render Charts
             renderCategorization(rawCS);
             renderHubAndSKU(rawCS);
         }
 
-        // CHART: Korelasi Pengiriman (Histogram)
         function renderDeliveryChart(times) {
             let buckets = {"< 15 Mnt": 0, "15 - 30 Mnt": 0, "30 - 60 Mnt": 0, "> 60 Mnt": 0};
             times.forEach(t => {
@@ -207,7 +223,6 @@
             }], layoutConfig, {displayModeBar: false});
         }
 
-        // CHART: Kategorisasi Keluhan
         function renderCategorization(data) {
             let typeCounts = {};
             data.forEach(r => {
@@ -221,7 +236,6 @@
             }], {...layoutConfig, margin: {l: 150, r:10, t:10, b:30}}, {displayModeBar: false});
         }
 
-        // CHART: Hub & SKU
         function renderHubAndSKU(data) {
             let hubCounts = {};
             let skuCounts = {};
@@ -243,17 +257,14 @@
             }], {...layoutConfig, title: {text:'Top SKU', font:{size:12}}, showlegend: true, legend: {y:-0.2}}, {displayModeBar: false});
         }
 
-        // FUNGSI RETENTION (Akan berjalan saat Order Data diupload)
         function processRetention() {
-            if(rawOrder.length === 0 || rawCS.length === 0) return;
+            if(rawOrder.length === 0) return;
             
-            document.getElementById('chartRetention').innerHTML = ''; // Clear placeholder
+            document.getElementById('chartRetention').innerHTML = ''; 
             
-            // Logika dasar: Ambil customer yang komplain, cek apakah mereka ada di data Order bulan berikutnya
-            // Saat ini kita buat visualisasi tren order bulanan dari data Order sebagai placeholder Retensi
             let orderTrend = {};
             rawOrder.forEach(r => {
-                let dateStr = r.order_date || r.date || r.created_time;
+                let dateStr = r.order_date || r.date || r.created_time || r.date_key;
                 if(dateStr) {
                     let m = new Date(dateStr).toLocaleString('id-ID', {month:'short', year:'2-digit'});
                     if(m !== 'Invalid Date') orderTrend[m] = (orderTrend[m] || 0) + 1;
@@ -262,7 +273,7 @@
 
             Plotly.newPlot('chartRetention', [{
                 x: Object.keys(orderTrend), y: Object.values(orderTrend), type: 'scatter', mode: 'lines+markers', line: {color: '#10b981', width: 3}
-            }], {...layoutConfig, yaxis: {title: 'Total Order (Retention Vol)'}}, {displayModeBar: false});
+            }], {...layoutConfig, yaxis: {title: 'Total Order Kumulatif'}}, {displayModeBar: false});
         }
     </script>
 </body>
